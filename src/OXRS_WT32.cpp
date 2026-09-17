@@ -657,10 +657,7 @@ void OXRS_WT32::_updateTelemetry(void)
     json["uptimeSeconds"] = millis() / 1000;
     json["heapFreeBytes"] = ESP.getFreeHeap();
     json["heapUsedBytes"] = ESP.getHeapSize();
-    json["mqttConnected"] = _mqtt.connected();
-#if defined(ETH_MODE)
-    json["linkUp"] = Ethernet.linkStatus() == LinkON;
-#else
+#if !defined(ETH_MODE)
     json["wifiRssi"] = WiFi.RSSI();
 #endif
 
