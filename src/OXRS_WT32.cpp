@@ -63,8 +63,8 @@ SHT2x sht;
 climateUpdateCallback _onClimateUpdate;
 
 // Climate update interval - extend or disable climate updates via
-// the MQTT config option "climateUpdateSeconds" - zero to disable
-uint32_t _climateUpdateMs = DEFAULT_CLIMATE_UPDATE_MS;
+// the MQTT config option "teleUpdateSeconds" - zero to disable
+uint32_t _teleUpdateMs = DEFAULT_TELE_UPDATE_MS;
 
 bool _sht20Found = false;
 
@@ -180,12 +180,12 @@ void _getConfigSchemaJson(JsonVariant json)
 
   if (_s3Detected || _sht20Found)
   {
-    JsonObject climateUpdateSeconds = properties["climateUpdateSeconds"].to<JsonObject>();
-    climateUpdateSeconds["title"] = "Sensor Update Interval (seconds)";
-    climateUpdateSeconds["description"] = "How often to read and report the value from connected sensors (ESP32 internal temperature, SHT20) (defaults to 60 seconds, setting to 0 disables climate reports). Must be a number between 0 and 86400 (i.e. 1 day).";
-    climateUpdateSeconds["type"] = "integer";
-    climateUpdateSeconds["minimum"] = 0;
-    climateUpdateSeconds["maximum"] = 86400;
+    JsonObject teleUpdateSeconds = properties["teleUpdateSeconds"].to<JsonObject>();
+    teleUpdateSeconds["title"] = "Telemetry Update Interval (seconds)";
+    teleUpdateSeconds["description"] = "How often to publish telemetry: device health (uptime, heap, connection) always, plus sensor readings (ESP32 internal temperature, SHT20) if present (defaults to 60 seconds, setting to 0 disables telemetry). Must be a number between 0 and 86400 (i.e. 1 day).";
+    teleUpdateSeconds["type"] = "integer";
+    teleUpdateSeconds["minimum"] = 0;
+    teleUpdateSeconds["maximum"] = 86400;
   }
 }
 
@@ -277,10 +277,10 @@ void _mqttDisconnected(int state)
 void _mqttConfig(JsonVariant json)
 {
   // SHT20 sensor config
-  if (json.containsKey("climateUpdateSeconds"))
+  if (json.containsKey("teleUpdateSeconds"))
   {
-    _climateUpdateMs = json["climateUpdateSeconds"].as<uint32_t>() * 1000L;
-    if (_climateUpdateMs == 0)
+    _teleUpdateMs = json["teleUpdateSeconds"].as<uint32_t>() * 1000L;
+    if (_teleUpdateMs == 0)
     {
       _temperature = NAN;
       _humidity = NAN;
@@ -416,7 +416,7 @@ void OXRS_WT32::loop(void)
   }
 
   // Check for climate update
-  _updateClimateSensor();
+  _updateTelemetry();
 }
 
 void OXRS_WT32::setConfigSchema(JsonVariant json)
@@ -608,20 +608,20 @@ void OXRS_WT32::_initialiseClimateSensor(void)
   temp_sensor_start();
 #endif
 
-  _lastClimateUpdate = -_climateUpdateMs;
+  _lastTeleUpdate = -_teleUpdateMs;
 }
 
 // get values from climate sensor, store local, publish /tele
-void OXRS_WT32::_updateClimateSensor(void)
+void OXRS_WT32::_updateTelemetry(void)
 {
   // Ignore if disabled
-  if (_climateUpdateMs == 0)
+  if (_teleUpdateMs == 0)
   {
     return;
   }
 
   // Check if we need to get new readings and publish
-  if ((millis() - _lastClimateUpdate) > _climateUpdateMs)
+  if ((millis() - _lastTeleUpdate) > _teleUpdateMs)
   {
     float tempESP;
     JsonDocument json;
@@ -653,16 +653,16 @@ void OXRS_WT32::_updateClimateSensor(void)
     }
 
 
-    // Basic device health - unconditional, every device supports these
+    // Device health - unconditional, every device supports these
     json["uptimeSeconds"] = millis() / 1000;
     json["heapFreeBytes"] = ESP.getFreeHeap();
     json["heapUsedBytes"] = ESP.getHeapSize();
     json["mqttConnected"] = _mqtt.connected();
-	#if defined(ETH_MODE)
-	    json["linkUp"] = Ethernet.linkStatus() == LinkON;
-	#else
-    		json["wifiRssi"] = WiFi.RSSI();
-	#endif
+#if defined(ETH_MODE)
+    json["linkUp"] = Ethernet.linkStatus() == LinkON;
+#else
+    json["wifiRssi"] = WiFi.RSSI();
+#endif
 
 
     // Publish climate to mqtt if there is something to show
@@ -672,7 +672,7 @@ void OXRS_WT32::_updateClimateSensor(void)
     }
 
     // Reset our timer
-    _lastClimateUpdate = millis();
+    _lastTeleUpdate = millis();
   }
 }
 
