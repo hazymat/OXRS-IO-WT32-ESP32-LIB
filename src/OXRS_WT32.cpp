@@ -652,6 +652,19 @@ void OXRS_WT32::_updateClimateSensor(void)
       }
     }
 
+
+    // Basic device health - unconditional, every device supports these
+    json["uptimeSeconds"] = millis() / 1000;
+    json["heapFreeBytes"] = ESP.getFreeHeap();
+    json["heapUsedBytes"] = ESP.getHeapSize();
+    json["mqttConnected"] = _mqtt.connected();
+	#if defined(ETH_MODE)
+	    json["linkUp"] = Ethernet.linkStatus() == LinkON;
+	#else
+    		json["wifiRssi"] = WiFi.RSSI();
+	#endif
+
+
     // Publish climate to mqtt if there is something to show
     if (!json.isNull())
     {
