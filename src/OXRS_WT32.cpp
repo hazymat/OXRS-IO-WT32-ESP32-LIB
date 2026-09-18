@@ -4,6 +4,7 @@
 
 #include "Arduino.h"
 #include <OXRS_WT32.h>
+#include "esp_timer.h"    // For 64-bit uptime
 
 #include <Ethernet.h>     // For networking
 #include <WiFi.h>         // Required for Ethernet to get MAC
@@ -654,10 +655,10 @@ void OXRS_WT32::_updateTelemetry(void)
 
 
     // Device health - unconditional, every device supports these
-    json["uptimeSeconds"] = millis() / 1000;
+    json["uptimeSeconds"] = esp_timer_get_time() / 1000000;
     json["heapFreeBytes"] = ESP.getFreeHeap();
     json["heapUsedBytes"] = ESP.getHeapSize();
-#if !defined(ETH_MODE)
+#if defined(WIFI_MODE)
     json["wifiRssi"] = WiFi.RSSI();
 #endif
 
